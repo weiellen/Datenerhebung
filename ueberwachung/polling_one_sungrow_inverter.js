@@ -27,8 +27,8 @@ var modbusInverterClient = new ModbusRTU();
 var config = { 
                   host: "home.china-solar.de",
                   port: 21, // defaults to 21
-                  user: "fehuser", 
-                  password: "Anfang123" 
+                  user: "xxx", 
+                  password: "xxx" 
          };
 ftp = new ftpClient();
 var properties = PropertiesReader('/home/pi/Datenerhebung/ueberwachung/resource/properties');  // TO DO: read properties e.g. reading frequence from file 
