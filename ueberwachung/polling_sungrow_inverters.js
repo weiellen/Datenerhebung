@@ -26,8 +26,8 @@ var ftp = new ftpClient();
 var config = { 
                   host: "home.china-solar.de", 
                   port: 21, // defaults to 21
-                  user: "fehuser", // defaults to "anonymous"
-                  password: "Anfang123" // defaults to "@anonymous"
+                  user: "xxx", // defaults to "anonymous"
+                  password: "xxx" // defaults to "@anonymous"
          };
 /* Read properties e.g. reading frequence from external file */
 var properties = PropertiesReader('/home/pi/Datenerhebung/ueberwachung/resource/properties'); 
