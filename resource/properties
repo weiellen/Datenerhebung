@@ -1,0 +1,10 @@
+projectpath=/home/pi/Datenerhebung/
+readingFrequence=300000
+uploadingFrequence=900000
+connectingFrequence=300000
+notUploadedFiles=0
+uploadSourceFolder=/home/pi/Datenerhebung/ueberwachung/csv/
+uploadDestinationFolder=/Zoerbig1/
+check_device_id_end=23
+singleDeviceID=1
+powerLimit=0
