@@ -337,6 +337,9 @@ function retrieveProperties(){
 			   if(properties!=null && properties.get("uploadingFrequence")!=0){
 				   uploadingFrequence = properties.get("uploadingFrequence");
 			   }
+	                   if(properties!=null && properties.get("check_device_id_end")!=0){
+				   check_device_id_end = properties.get("check_device_id_end");
+			   } 
 }
 
 function ftpConnect(){
