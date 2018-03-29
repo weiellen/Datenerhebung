@@ -26,8 +26,8 @@ var ftp = new ftpClient();
 var config = { 
                   host: "home.china-solar.de", 
                   port: 21, // defaults to 21
-                  user: "xxx", // defaults to "anonymous"
-                  password: "xxx" // defaults to "@anonymous"
+                  user: "fehuser", // defaults to "anonymous"
+                  password: "Anfang123" // defaults to "@anonymous"
          };
 /* Read properties e.g. reading frequence from external file */
 var properties = PropertiesReader('/home/pi/Datenerhebung/ueberwachung/resource/properties'); 
@@ -67,6 +67,41 @@ var reconnectRTUintervalObject;
 var reconnectFTPintervalObject;
 var retrieveIdsInvervalObject;
 var retryPollingRegistersInvervalObject;
+var actualDatum;
+var actualTime;
+						           var deviceType ;
+						           var temperature ;
+						           // DC
+                                   var upv1 =0;  
+                                   var upv2 =0; 
+                                   var upv3 =0; 
+                                   var upv4 =0;   
+                                   var upv5 =0; 
+                                   var upv6 = 0; 
+                                   var ipv1 = 0;  
+                                   var ipv2 = 0; 
+                                   var ipv3 =0; 
+                                   var ipv4 = 0;  
+                                   var ipv5 = 0;
+                                   var ipv6 = 0;
+                
+                                   // AC
+                                   var uac1 = 0;
+                                   var uac2 = 0;
+                                   var uac3 = 0;
+                                   var iac1 = 0;  
+                                   var iac2 = 0; 
+                                   var iac3 = 0; 
+                           
+                                   var pac= 0;
+                                   var cos= 0;
+                                   var fac= 0;   
+                                   var status = 0;    
+                                   var error = 0;             
+                                   var qac= 0;
+                                   var eac= 0;
+
+						           var actualData='';
 /***********************************************end of variables and constants****************************************************************************************/
 
 /**********************************************************Entry Point**************************************************************************************************/
@@ -139,56 +174,51 @@ function connectFTP(){
 }
 
 /* STEP 3 Retrieve IDs of all available inverters recursively*/
-function retrieveAvailableInverterIDs(){
-	      modbusInverterClient.setID(deviceId); 
+async function retrieveAvailableInverterIDs(){
+	
+	      while(deviceId<check_device_id_end){
+		  	  await retrieveCertainInverterID(deviceId);		  
+		  }
+
+		   if(deviceId==check_device_id_end){
+			     //if no devices found, repeat to search from the beginning
+				 if(availableDevice.length==0){ 
+							 logger.log('info',  'no devices are found. retry it after '+parseInt(readingFrequence/60000, 10)+' minutes.'); 
+				             deviceId=check_device_id_start;
+					         clearInterval(retrieveIdsInvervalObject);
+				             retrieveIdsInvervalObject = setInterval(retrieveAvailableInverterIDs, connectingFrequence);  	 
+				 }
+			     else{
+							 clearInterval(retrieveIdsInvervalObject);
+	                         logger.log('info', 'Totally '+availableDevice.length+' active device(s) of '+check_device_id_end+' requested devices are found!');	
+						     pollingReadRegisters();
+				 }
+	   }
+ }
+
+async function retrieveCertainInverterID(did) {
+		  await modbusInverterClient.setID(did); 
 	      //modbusInverterClient.setTimeout(1000);
 	      //read work state 5038-1=5037
 	      //according to the sungrow communication protocol, communication address = protocol address -1
-	      modbusInverterClient.readInputRegisters(5037, 1, (err, data) =>{
+	      await modbusInverterClient.readInputRegisters(5037, 1, (err, data) =>{
 		      if(err){
 		     		  logger.log('warn', 'no device '+deviceId); 
-					  if(deviceId<check_device_id_end){
-					     deviceId++;
-					     retrieveAvailableInverterIDs();
-				      }
-				      else{//if no devices found, repeat to search from the beginning
-						  if(availableDevice.length==0){ 
-							 logger.log('info',  'no devices are found. retry it after '+parseInt(readingFrequence/60000, 10)+' minutes.'); 
-				             deviceId=check_device_id_start;
-				             retrieveIdsInvervalObject = setInterval(retrieveAvailableInverterIDs, connectingFrequence);  	 
-					       }
-					       else{
-							     clearInterval(retrieveIdsInvervalObject);
-	          logger.log('info', 'Totally '+availableDevice.length+' active device(s) of '+check_device_id_end+' requested devices are found!');	
-                  logger.log('info', 'try to read these devices');
-								 pollingReadRegisters();
-						   }
-				      }
 		      }
 		      else{		
 				    if(data.data[0]>0){ //  if the work state is not RUN
 						logger.log('warn', 'device '+deviceId+ 'is not active'); 
-						clearInterval(retrieveIdsInvervalObject);
-						deviceId++;
-					    retrieveAvailableInverterIDs();
 					}
 					else{
-						 clearInterval(retrieveIdsInvervalObject);
 				         logger.log('info', 'device '+deviceId+' is found'); 			
-					     availableDevice.push(deviceId);var projectpath='/home/pi/Datenerhebung/';
-					     if(deviceId<check_device_id_end){
-					        deviceId++;
-					        retrieveAvailableInverterIDs();
-				          }
-				          else{
-	          logger.log('info', 'Totally '+availableDevice.length+' active device(s) of '+check_device_id_end+' requested devices are found!');	
-                  logger.log('info', 'try to read these devices');
-                            pollingReadRegisters();
-				          }
+					     availableDevice.push(deviceId);		          
 				    }
 		       }
+			  if(deviceId<check_device_id_end){
+					     deviceId++;
+				  }
 		});
- }
+}
 
 /* STEP 4 polling inverters, Core function for reading data of each available inverter recursively*/
 async function  pollingReadRegisters(){ 
@@ -199,83 +229,14 @@ async function  pollingReadRegisters(){
 			   cycleTime=1;
 			   alreadyNewDay=true;
 		   }
-		   var actualDatum = new Date().toLocaleDateString().trim();
-	       var actualTime = new Date().toLocaleString().replace(',',' ');
+		   actualDatum = new Date().toLocaleDateString().trim();
+	       actualTime = new Date().toLocaleString().replace(',',' ');
 	       
-	      if(counter<availableDevice.length){
-		      logger.log('info', 'try to read the '+(counter+1)+'th device with ID '+availableDevice[counter]);
-		      await modbusInverterClient.setID(availableDevice[counter]);
-	          //IMPORTANT: read the 39 registers starting at address 5000-1=4999
-              //for reading read only register, sungrow supports the command code 0x04 i.e. READ INPUT REGISTERS  
-		      await modbusInverterClient.readInputRegisters(4999, 39, (error, data) =>{ 
-					        if(error){
-						           logger.log('error', 'error during reading: ' +error.message);				
-						           //then read the next device										    
-						           if(counter<availableDevice.length-1){
-								        counter++; 				
-								        pollingReadRegisters();
-							       }	
-							       //or start next round
-						           else{
-							             counter=0;			
-							             //retryPollingRegistersInvervalObject = setInterval(pollingReadRegisters, connectingFrequence);					             
-							        }
-					         }
-					         else{
-								  //clearInterval(retryPollingRegistersInvervalObject);  
-						          //logger.log('info', 'inverter data: ' +data.data);
-						           var deviceType = data.data[0];
-						           var temperature = (data.data[8]*0.1).toFixed(2);
-						           // DC
-                                   var upv1 = (data.data[11]*0.1).toFixed(2);  
-                                   var upv2 = (data.data[13]*0.1).toFixed(2); 
-                                   var upv3 = (data.data[15]*0.1).toFixed(2); 
-                                   var upv4 = 0;   
-                                   var upv5 = 0; 
-                                   var upv6 = 0; 
-                                   var ipv1 = (data.data[12]*0.1).toFixed(2);  
-                                   var ipv2 = (data.data[14]*0.1).toFixed(2); 
-                                   var ipv3 = (data.data[16]*0.1).toFixed(2); 
-                                   var ipv4 = 0;  
-                                   var ipv5 = 0;
-                                   var ipv6 = 0;
-                
-                                   // AC
-                                   var uac1 = (data.data[19]*0.1).toFixed(2);
-                                   var uac2 = (data.data[20]*0.1).toFixed(2);
-                                   var uac3 = (data.data[21]*0.1).toFixed(2);
-                                   var iac1 = (data.data[22]*0.1).toFixed(2);  
-                                   var iac2 = (data.data[23]*0.1).toFixed(2); 
-                                   var iac3 = (data.data[24]*0.1).toFixed(2); 
-                           
-                                   var pac= (data.data[31] * 0.001).toFixed(2);
-                                   var cos= (data.data[35]*0.001).toFixed(2);
-                                   var fac= (data.data[36]*0.1).toFixed(2);   
-                                   var status = data.data[38];    
-                                   var error = 0;             
-                                   var qac= 0;
-                                   var eac= 0;
-                                   					                           
-						           var actualData = actualTime+';'+upv1+';'+upv2+';'+upv3+';'+upv4+';'+upv5+';'+upv6+';'
-				                   +ipv1+';'+ipv2+';'+ipv3+';'+ipv4+';'+ipv5+';'+ipv6
-				                   +';'+uac1+';'+uac2+';'+uac3
-				                   +';'+iac1+';'+iac2+';'+iac3
-				                   +';'+status+';'+error+';'+temperature+';'+cos+';'+fac+';'+pac+';'+qac+';'+eac+';'+cycleTime
-				                   +'\n';				                   
-				                   		      											    									  												
-								 if(fullHash[counter]==null){
-									 	titleInverter = '#Inverter#'+ availableDevice[counter] +' ESN: 0000000'+ availableDevice[counter]+'\n';  
-										fullHash[counter] =titleInverter+lineTitle;
-								  }
-								 fullHash[counter] += actualData;	
-								 //then read the next inverter 																					    
-								 counter++; 				
-								 pollingReadRegisters();		
-		       						        
-					          }	
-			  });   
+	      while(counter<availableDevice.length){
+		            logger.log('info', 'try to read the '+(counter+1)+'th device with ID '+availableDevice[counter]);
+                    await readCertainDeviceRegisters(availableDevice[counter]);
 		  }
-		  else{                  
+		  if(counter==availableDevice.length){                  
 			                   //clearInterval(retryPollingRegistersInvervalObject);  
 							    var output = titleRaspberry;
 	                            for (var key in fullHash) {
@@ -289,7 +250,7 @@ async function  pollingReadRegisters(){
 										    }}); 
 							   counter=0;			
 							   cycleTime++;	  	
-                                                           setTimeout(pollingReadRegisters, readingFrequence);
+                               setTimeout(pollingReadRegisters, readingFrequence);
 							   // schedule uploading
 							   var modulo = parseInt(Number(uploadingFrequence) / Number(readingFrequence), 10); 
 							   if(cycleTime>modulo && (cycleTime-1) % modulo == 0){  
@@ -297,6 +258,69 @@ async function  pollingReadRegisters(){
 								   await uploadInverterDataToFTP();
 						       }  
 		}
+}
+
+async function readCertainDeviceRegisters(did){
+			   await modbusInverterClient.setID(did);  //availableDevice[counter])
+	          //IMPORTANT: read the 39 registers starting at address 5000-1=4999
+              //for reading read only register, sungrow supports the command code 0x04 i.e. READ INPUT REGISTERS  
+		      await modbusInverterClient.readInputRegisters(4999, 39, (error, data) =>{ 
+					        if(error){
+						           logger.log('error', 'error during reading: ' +error.message);				
+						           //then read the next device										    
+					         }
+					         else{
+								  //clearInterval(retryPollingRegistersInvervalObject);  
+						          //logger.log('info', 'inverter data: ' +data.data);
+						           deviceType = data.data[0];
+						           temperature = (data.data[8]*0.1).toFixed(2);
+						           // DC
+                                   upv1 = (data.data[11]*0.1).toFixed(2);  
+                                   upv2 = (data.data[13]*0.1).toFixed(2); 
+                                   upv3 = (data.data[15]*0.1).toFixed(2); 
+                                   upv4 = 0;   
+                                   upv5 = 0; 
+                                   upv6 = 0; 
+                                   ipv1 = (data.data[12]*0.1).toFixed(2);  
+                                   ipv2 = (data.data[14]*0.1).toFixed(2); 
+                                   ipv3 = (data.data[16]*0.1).toFixed(2); 
+                                   ipv4 = 0;  
+                                   ipv5 = 0;
+                                   ipv6 = 0;
+                
+                                   // AC
+                                   uac1 = (data.data[19]*0.1).toFixed(2);
+                                   uac2 = (data.data[20]*0.1).toFixed(2);
+                                   uac3 = (data.data[21]*0.1).toFixed(2);
+                                   iac1 = (data.data[22]*0.1).toFixed(2);  
+                                   iac2 = (data.data[23]*0.1).toFixed(2); 
+                                   iac3 = (data.data[24]*0.1).toFixed(2); 
+                           
+                                   pac= (data.data[31] * 0.001).toFixed(2);
+                                   cos= (data.data[35]*0.001).toFixed(2);
+                                   fac= (data.data[36]*0.1).toFixed(2);   
+                                   status = data.data[38];    
+                                   error = 0;             
+                                   qac= 0;
+                                   eac= 0;
+                                   					                           
+						           var actualData = actualTime+';'+upv1+';'+upv2+';'+upv3+';'+upv4+';'+upv5+';'+upv6+';'
+				                   +ipv1+';'+ipv2+';'+ipv3+';'+ipv4+';'+ipv5+';'+ipv6
+				                   +';'+uac1+';'+uac2+';'+uac3
+				                   +';'+iac1+';'+iac2+';'+iac3
+				                   +';'+status+';'+error+';'+temperature+';'+cos+';'+fac+';'+pac+';'+qac+';'+eac+';'+cycleTime
+				                   +'\n';				                   
+				                   		      											    									  												
+								 if(fullHash[did]==null){
+									 	titleInverter = '#Inverter#'+ availableDevice[did] +' ESN: 0000000'+ availableDevice[did]+'\n';  
+										fullHash[did] =titleInverter+lineTitle;
+								  }
+								 fullHash[did] += actualData;	
+								 //then read the next inverter 																					    
+								 counter++; 					       						        
+					          }	
+			  }); 	
+	
 }
 
 /* upload the actual file */
@@ -337,9 +361,6 @@ function retrieveProperties(){
 			   if(properties!=null && properties.get("uploadingFrequence")!=0){
 				   uploadingFrequence = properties.get("uploadingFrequence");
 			   }
-	                   if(properties!=null && properties.get("check_device_id_end")!=0){
-				   check_device_id_end = properties.get("check_device_id_end");
-			   } 
 }
 
 function ftpConnect(){
